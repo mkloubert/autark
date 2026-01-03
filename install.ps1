@@ -397,20 +397,8 @@ function Get-PackageManager {
 # Phase 2: Install Required Tools
 # =============================================================================
 
-function Invoke-AsRoot {
-    param([string]$Command, [string[]]$Arguments)
-
-    # Check if we're already root
-    $uid = & id -u 2>$null
-    if ($uid -eq "0") {
-        # Already root, run directly
-        & $Command @Arguments
-    }
-    else {
-        # Need sudo
-        & sudo $Command @Arguments
-    }
-}
+# Note: Test-AdminPrivileges already verified we have admin/root privileges,
+# so all commands run directly without sudo (which doesn't exist on Windows)
 
 function Install-Package {
     param([string]$Package)
@@ -428,35 +416,35 @@ function Install-Package {
             & brew install --quiet $Package
         }
         "port" {
-            Invoke-AsRoot -Command "port" -Arguments @("install", $Package)
+            & port install $Package
         }
         "apt" {
-            Invoke-AsRoot -Command "apt-get" -Arguments @("update", "-qq")
-            Invoke-AsRoot -Command "apt-get" -Arguments @("install", "-y", "-qq", $Package)
+            & apt-get update -qq
+            & apt-get install -y -qq $Package
         }
         "dnf" {
-            Invoke-AsRoot -Command "dnf" -Arguments @("install", "-y", "-q", $Package)
+            & dnf install -y -q $Package
         }
         "pacman" {
-            Invoke-AsRoot -Command "pacman" -Arguments @("-Sy", "--noconfirm", "--quiet", $Package)
+            & pacman -Sy --noconfirm --quiet $Package
         }
         "zypper" {
-            Invoke-AsRoot -Command "zypper" -Arguments @("install", "-y", "-q", $Package)
+            & zypper install -y -q $Package
         }
         "apk" {
-            Invoke-AsRoot -Command "apk" -Arguments @("add", "--quiet", $Package)
+            & apk add --quiet $Package
         }
         "emerge" {
-            Invoke-AsRoot -Command "emerge" -Arguments @("--quiet", $Package)
+            & emerge --quiet $Package
         }
         "xbps-install" {
-            Invoke-AsRoot -Command "xbps-install" -Arguments @("-y", $Package)
+            & xbps-install -y $Package
         }
         "snap" {
-            Invoke-AsRoot -Command "snap" -Arguments @("install", $Package)
+            & snap install $Package
         }
         "flatpak" {
-            Invoke-AsRoot -Command "flatpak" -Arguments @("install", "-y", $Package)
+            & flatpak install -y $Package
         }
         default {
             Write-LogError "Unknown package manager: $Script:PkgMgr"
