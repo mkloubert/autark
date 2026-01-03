@@ -1,0 +1,66 @@
+services:
+  debian11:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.debian11
+    platform: linux/amd64
+    volumes:
+      - .:/app
+    working_dir: /app
+    stdin_open: true
+    tty: true
+
+  debian12:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.debian12
+    platform: linux/amd64
+    volumes:
+      - .:/app
+    working_dir: /app
+    stdin_open: true
+    tty: true
+
+  debian13:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.debian13
+    platform: linux/amd64
+    volumes:
+      - .:/app
+    working_dir: /app
+    stdin_open: true
+    tty: true
+
+  ubuntu20:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.ubuntu20
+    platform: linux/amd64
+    volumes:
+      - .:/app
+    working_dir: /app
+    stdin_open: true
+    tty: true
+
+  ubuntu24:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.ubuntu24
+    platform: linux/amd64
+    volumes:
+      - .:/app
+    working_dir: /app
+    stdin_open: true
+    tty: true
+
+  ubuntu26:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.ubuntu26
+    platform: linux/amd64
+    volumes:
+      - .:/app
+    working_dir: /app
+    stdin_open: true
+    tty: true
