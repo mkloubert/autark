@@ -67,6 +67,28 @@ func checkDocker() *DoctorResult {
 	return result
 }
 
+func checkDockerDaemon(dockerResult *DoctorResult) *DoctorResult {
+	result := &DoctorResult{
+		Name:      "docker daemon",
+		Installed: false,
+	}
+
+	// If docker is not installed, daemon check is not applicable
+	if !dockerResult.Installed {
+		result.Error = fmt.Errorf("docker not installed")
+		return result
+	}
+
+	if isDockerDaemonRunning() {
+		result.Installed = true
+		result.Version = "running"
+	} else {
+		result.Error = fmt.Errorf("not running")
+	}
+
+	return result
+}
+
 func ensureDockerDaemonRunning(a *app.AppContext) error {
 	if isDockerDaemonRunning() {
 		a.D("Docker daemon is already running")
@@ -585,6 +607,11 @@ func runDoctor(a *app.AppContext, opts *DoctorOptions) {
 	results = append(results, dockerResult)
 	printResult(a, dockerResult)
 
+	// Check docker daemon status
+	dockerDaemonResult := checkDockerDaemon(dockerResult)
+	results = append(results, dockerDaemonResult)
+	printResult(a, dockerDaemonResult)
+
 	a.WriteLn("")
 
 	// Count issues
@@ -636,18 +663,19 @@ func runDoctor(a *app.AppContext, opts *DoctorOptions) {
 		}
 	}
 
+	// Start docker daemon if needed
+	if !dockerDaemonResult.Installed {
+		if err := ensureDockerDaemonRunning(a); err != nil {
+			a.WriteErrLn(fmt.Sprintf("Failed to start docker daemon: %s", err.Error()))
+			repairErrors++
+		}
+	}
+
 	if repairErrors > 0 {
 		a.WriteLn("")
 		a.WriteErrF("Repair completed with %d error(s).", repairErrors)
 		a.WriteLn("")
 		os.Exit(1)
-	}
-
-	// Ensure docker daemon is running at the end
-	a.WriteLn("")
-	if err := ensureDockerDaemonRunning(a); err != nil {
-		a.WriteErrLn(fmt.Sprintf("Warning: %s", err.Error()))
-		a.WriteLn("You may need to start Docker manually.")
 	}
 
 	a.WriteLn("")
