@@ -104,9 +104,10 @@ autark doctor -r
 The doctor command will:
 - Check if git is installed
 - Check if docker is installed
+- Check if docker daemon is running
 - Display version information for installed tools
 - Show errors for missing tools
-- With `--repair` flag: attempt to install missing dependencies using your system's package manager
+- With `--repair` flag: attempt to install missing dependencies and start docker daemon if not running
 
 #### setup (alias: s)
 
