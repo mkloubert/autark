@@ -22,9 +22,12 @@
 package app
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/mkloubert/autark/utils"
 	"github.com/spf13/cobra"
@@ -135,6 +138,65 @@ func (a *AppContext) Platform() *utils.PlatformInfo {
 	return a.platform
 }
 
+// PromptPort prompts the user for a port number with a suggested default
+func (a *AppContext) PromptPort(prompt string, defaultPort int) int {
+	reader := bufio.NewReader(a.Stdin())
+
+	for {
+		a.WriteF("%s [%d]: ", prompt, defaultPort)
+
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return defaultPort
+		}
+
+		input = strings.TrimSpace(input)
+
+		if input == "" {
+			return defaultPort
+		}
+
+		port, err := strconv.Atoi(input)
+		if err != nil {
+			a.WriteErrLn("Invalid port number. Please enter a valid number.")
+			continue
+		}
+
+		if port < 1 || port > 65535 {
+			a.WriteErrLn("Port must be between 1 and 65535.")
+			continue
+		}
+
+		return port
+	}
+}
+
+// PromptYesNo prompts the user with a yes/no question and returns true for yes
+func (a *AppContext) PromptYesNo(prompt string, defaultYes bool) bool {
+	for {
+		reader := bufio.NewReader(a.Stdin())
+
+		hint := "[y/N]"
+		if defaultYes {
+			hint = "[Y/n]"
+		}
+
+		a.WriteF("%s %s: ", prompt, hint)
+
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return defaultYes
+		}
+
+		switch strings.TrimSpace(strings.ToLower(input)) {
+		case "n", "no", "y", "yes":
+			return input == "y" || input == "yes"
+		case "":
+			return defaultYes
+		}
+	}
+}
+
 // RootCommand returns the unterlying root command
 // of this app
 func (a *AppContext) RootCommand() *cobra.Command {
@@ -149,6 +211,11 @@ func (a *AppContext) Run() error {
 // Stderr returns standard error used by this app
 func (a *AppContext) Stderr() *os.File {
 	return a.stderr
+}
+
+// Stdin returns standard input used by this app
+func (a *AppContext) Stdin() *os.File {
+	return a.stdin
 }
 
 // Stdout returns standard output used by this app

@@ -24,6 +24,7 @@ package utils
 import (
 	"bufio"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 )
@@ -86,33 +87,18 @@ type PlatformInfo struct {
 	PackageManager PackageManager
 }
 
-// DetectPlatform detects the current platform information
-func DetectPlatform() *PlatformInfo {
-	info := &PlatformInfo{
-		OS:             OSUnknown,
-		Arch:           runtime.GOARCH,
-		LinuxDistro:    DistroUnknown,
-		LinuxDistroID:  "",
-		PackageManager: PkgMgrUnknown,
+func (p *PlatformInfo) detectBSDPackageManager() {
+	if CommandExists("pkg") {
+		p.PackageManager = PkgMgrPkg
 	}
+}
 
-	switch runtime.GOOS {
-	case "linux":
-		info.OS = OSLinux
-		info.detectLinuxDistro()
-		info.detectLinuxPackageManager()
-	case "darwin":
-		info.OS = OSDarwin
-		info.detectDarwinPackageManager()
-	case "windows":
-		info.OS = OSWindows
-		info.detectWindowsPackageManager()
-	case "freebsd", "netbsd", "openbsd", "dragonfly":
-		info.OS = OSFreeBSD
-		info.detectBSDPackageManager()
+func (p *PlatformInfo) detectDarwinPackageManager() {
+	if CommandExists("brew") {
+		p.PackageManager = PkgMgrBrew
+	} else if CommandExists("port") {
+		p.PackageManager = PkgMgrPort
 	}
-
-	return info
 }
 
 func (p *PlatformInfo) detectLinuxDistro() {
@@ -217,12 +203,33 @@ func (p *PlatformInfo) detectLinuxPackageManagerFallback() {
 	}
 }
 
-func (p *PlatformInfo) detectDarwinPackageManager() {
-	if CommandExists("brew") {
-		p.PackageManager = PkgMgrBrew
-	} else if CommandExists("port") {
-		p.PackageManager = PkgMgrPort
+// DetectPlatform detects the current platform information
+func DetectPlatform() *PlatformInfo {
+	info := &PlatformInfo{
+		OS:             OSUnknown,
+		Arch:           runtime.GOARCH,
+		LinuxDistro:    DistroUnknown,
+		LinuxDistroID:  "",
+		PackageManager: PkgMgrUnknown,
 	}
+
+	switch runtime.GOOS {
+	case "linux":
+		info.OS = OSLinux
+		info.detectLinuxDistro()
+		info.detectLinuxPackageManager()
+	case "darwin":
+		info.OS = OSDarwin
+		info.detectDarwinPackageManager()
+	case "windows":
+		info.OS = OSWindows
+		info.detectWindowsPackageManager()
+	case "freebsd", "netbsd", "openbsd", "dragonfly":
+		info.OS = OSFreeBSD
+		info.detectBSDPackageManager()
+	}
+
+	return info
 }
 
 func (p *PlatformInfo) detectWindowsPackageManager() {
@@ -233,10 +240,24 @@ func (p *PlatformInfo) detectWindowsPackageManager() {
 	}
 }
 
-func (p *PlatformInfo) detectBSDPackageManager() {
-	if CommandExists("pkg") {
-		p.PackageManager = PkgMgrPkg
+// IsRoot checks if the current process has root/administrator privileges
+func IsRoot() bool {
+	switch runtime.GOOS {
+	case "windows":
+		return isWindowsAdmin()
+	default:
+		// Unix-like systems (Linux, macOS, BSD)
+		return os.Getuid() == 0
 	}
+}
+
+// isWindowsAdmin checks for administrator privileges on Windows
+func isWindowsAdmin() bool {
+	// Try to execute a command that requires admin privileges
+	// We use "net session" which fails if not running as admin
+	cmd := exec.Command("cmd", "/C", "net", "session")
+	err := cmd.Run()
+	return err == nil
 }
 
 func parseOSRelease(path string) (map[string]string, error) {

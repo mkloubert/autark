@@ -89,106 +89,6 @@ func checkDockerDaemon(dockerResult *DoctorResult) *DoctorResult {
 	return result
 }
 
-func ensureDockerDaemonRunning(a *app.AppContext) error {
-	if isDockerDaemonRunning() {
-		a.D("Docker daemon is already running")
-		return nil
-	}
-
-	a.WriteLn("Docker daemon is not running. Attempting to start...")
-
-	if err := startDockerDaemon(a); err != nil {
-		return fmt.Errorf("failed to start docker daemon: %w", err)
-	}
-
-	// Verify daemon is now running
-	if !isDockerDaemonRunning() {
-		return fmt.Errorf("docker daemon failed to start")
-	}
-
-	a.WriteLn("Docker daemon started successfully.")
-	return nil
-}
-
-func isDockerDaemonRunning() bool {
-	cmd := exec.Command("docker", "info")
-	return cmd.Run() == nil
-}
-
-func startDockerDaemon(a *app.AppContext) error {
-	switch a.Platform().OS {
-	case utils.OSLinux:
-		return startDockerDaemonLinux(a)
-	case utils.OSDarwin:
-		return startDockerDaemonDarwin(a)
-	case utils.OSWindows:
-		return startDockerDaemonWindows(a)
-	default:
-		return fmt.Errorf("starting docker daemon not supported on %s", a.Platform().OS)
-	}
-}
-
-func startDockerDaemonLinux(a *app.AppContext) error {
-	// Try systemd first (most common)
-	if utils.CommandExists("systemctl") {
-		a.D("Attempting to start docker via systemctl...")
-		if err := runInstallCommandDirect("systemctl", "start", "docker"); err == nil {
-			return nil
-		}
-	}
-
-	// Try OpenRC (Alpine, Gentoo)
-	if utils.CommandExists("rc-service") {
-		a.D("Attempting to start docker via rc-service...")
-		if err := runInstallCommandDirect("rc-service", "docker", "start"); err == nil {
-			return nil
-		}
-	}
-
-	// Try service command (generic fallback)
-	if utils.CommandExists("service") {
-		a.D("Attempting to start docker via service...")
-		if err := runInstallCommandDirect("service", "docker", "start"); err == nil {
-			return nil
-		}
-	}
-
-	// Try starting dockerd directly as last resort
-	a.D("Attempting to start dockerd directly...")
-	cmd := exec.Command("dockerd")
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("could not start docker daemon: %w", err)
-	}
-
-	// Wait a moment for daemon to initialize
-	return nil
-}
-
-func startDockerDaemonDarwin(a *app.AppContext) error {
-	a.D("Attempting to start Docker Desktop on macOS...")
-
-	// Try to open Docker Desktop
-	if err := runInstallCommandDirect("open", "-a", "Docker"); err != nil {
-		return fmt.Errorf("failed to start Docker Desktop: %w", err)
-	}
-
-	a.WriteLn("Docker Desktop is starting. Please wait for it to initialize...")
-	return nil
-}
-
-func startDockerDaemonWindows(a *app.AppContext) error {
-	a.D("Attempting to start Docker Desktop on Windows...")
-
-	// Try to start Docker Desktop via PowerShell
-	cmd := exec.Command("powershell", "-Command", "Start-Process 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to start Docker Desktop: %w", err)
-	}
-
-	a.WriteLn("Docker Desktop is starting. Please wait for it to initialize...")
-	return nil
-}
-
 func checkGit() *DoctorResult {
 	result := &DoctorResult{
 		Name:      "git",
@@ -208,6 +108,51 @@ func checkGit() *DoctorResult {
 	result.Installed = true
 	result.Version = strings.TrimSpace(string(output))
 	return result
+}
+
+func checkRootPrivileges() *DoctorResult {
+	result := &DoctorResult{
+		Name:      "root/admin privileges",
+		Installed: false,
+	}
+
+	if utils.IsRoot() {
+		result.Installed = true
+		if runtime.GOOS == "windows" {
+			result.Version = "administrator"
+		} else {
+			result.Version = "root"
+		}
+	} else {
+		if runtime.GOOS == "windows" {
+			result.Error = fmt.Errorf("not running as administrator")
+		} else {
+			result.Error = fmt.Errorf("not running as root")
+		}
+	}
+
+	return result
+}
+
+func ensureDockerDaemonRunning(a *app.AppContext) error {
+	if isDockerDaemonRunning() {
+		a.D("Docker daemon is already running")
+		return nil
+	}
+
+	a.WriteLn("Docker daemon is not running. Attempting to start...")
+
+	if err := startDockerDaemon(a); err != nil {
+		return fmt.Errorf("failed to start docker daemon: %w", err)
+	}
+
+	// Verify daemon is now running
+	if !isDockerDaemonRunning() {
+		return fmt.Errorf("docker daemon failed to start")
+	}
+
+	a.WriteLn("Docker daemon started successfully.")
+	return nil
 }
 
 func getVersionCodename() string {
@@ -263,6 +208,36 @@ func installDockerAlpine(a *app.AppContext) error {
 	}
 
 	return nil
+}
+
+func installDockerArch(a *app.AppContext) error {
+	a.D("Installing Docker on Arch Linux...")
+
+	commands := [][]string{
+		{"pacman", "-Sy", "--noconfirm", "docker", "docker-compose"},
+		{"systemctl", "enable", "--now", "docker"},
+	}
+
+	for _, cmd := range commands {
+		if err := runInstallCommandDirect(cmd[0], cmd[1:]...); err != nil {
+			return fmt.Errorf("failed to run %s: %w", cmd[0], err)
+		}
+	}
+
+	return nil
+}
+
+func installDockerByPackageManager(a *app.AppContext) error {
+	a.D("Installing Docker via package manager fallback...")
+
+	switch a.Platform().PackageManager {
+	case utils.PkgMgrSnap:
+		return runInstallCommandDirect("snap", "install", "docker")
+	case utils.PkgMgrFlatpak:
+		return fmt.Errorf("docker cannot be installed via flatpak, please install docker manually")
+	default:
+		return fmt.Errorf("docker installation not supported for package manager: %s", a.Platform().PackageManager)
+	}
 }
 
 func installDockerDebian(a *app.AppContext) error {
@@ -328,36 +303,6 @@ func installDockerDebian(a *app.AppContext) error {
 	}
 
 	return nil
-}
-
-func installDockerArch(a *app.AppContext) error {
-	a.D("Installing Docker on Arch Linux...")
-
-	commands := [][]string{
-		{"pacman", "-Sy", "--noconfirm", "docker", "docker-compose"},
-		{"systemctl", "enable", "--now", "docker"},
-	}
-
-	for _, cmd := range commands {
-		if err := runInstallCommandDirect(cmd[0], cmd[1:]...); err != nil {
-			return fmt.Errorf("failed to run %s: %w", cmd[0], err)
-		}
-	}
-
-	return nil
-}
-
-func installDockerByPackageManager(a *app.AppContext) error {
-	a.D("Installing Docker via package manager fallback...")
-
-	switch a.Platform().PackageManager {
-	case utils.PkgMgrSnap:
-		return runInstallCommandDirect("snap", "install", "docker")
-	case utils.PkgMgrFlatpak:
-		return fmt.Errorf("docker cannot be installed via flatpak, please install docker manually")
-	default:
-		return fmt.Errorf("docker installation not supported for package manager: %s", a.Platform().PackageManager)
-	}
 }
 
 func installDockerFedora(a *app.AppContext) error {
@@ -428,6 +373,11 @@ func installDockerVoid(a *app.AppContext) error {
 	}
 
 	return nil
+}
+
+func isDockerDaemonRunning() bool {
+	cmd := exec.Command("docker", "info")
+	return cmd.Run() == nil
 }
 
 func printResult(a *app.AppContext, r *DoctorResult) {
@@ -597,6 +547,11 @@ func runDoctor(a *app.AppContext, opts *DoctorOptions) {
 
 	results := make([]*DoctorResult, 0)
 
+	// Check root/admin privileges
+	rootResult := checkRootPrivileges()
+	results = append(results, rootResult)
+	printResult(a, rootResult)
+
 	// Check git
 	gitResult := checkGit()
 	results = append(results, gitResult)
@@ -633,6 +588,20 @@ func runDoctor(a *app.AppContext, opts *DoctorOptions) {
 	if !opts.Repair {
 		a.WriteLn("")
 		a.WriteLn("Run 'autark doctor --repair' to fix missing dependencies.")
+		os.Exit(1)
+		return
+	}
+
+	// Check for root/admin privileges before attempting repair
+	if !utils.IsRoot() {
+		a.WriteLn("")
+		if runtime.GOOS == "windows" {
+			a.WriteErrLn("Error: --repair requires administrator privileges.")
+			a.WriteErrLn("Please run this command as Administrator.")
+		} else {
+			a.WriteErrLn("Error: --repair requires root privileges.")
+			a.WriteErrLn("Please run this command with sudo.")
+		}
 		os.Exit(1)
 		return
 	}
@@ -700,4 +669,78 @@ func runInstallCommandDirect(name string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func startDockerDaemon(a *app.AppContext) error {
+	switch a.Platform().OS {
+	case utils.OSLinux:
+		return startDockerDaemonLinux(a)
+	case utils.OSDarwin:
+		return startDockerDaemonDarwin(a)
+	case utils.OSWindows:
+		return startDockerDaemonWindows(a)
+	default:
+		return fmt.Errorf("starting docker daemon not supported on %s", a.Platform().OS)
+	}
+}
+
+func startDockerDaemonLinux(a *app.AppContext) error {
+	// Try systemd first (most common)
+	if utils.CommandExists("systemctl") {
+		a.D("Attempting to start docker via systemctl...")
+		if err := runInstallCommandDirect("systemctl", "start", "docker"); err == nil {
+			return nil
+		}
+	}
+
+	// Try OpenRC (Alpine, Gentoo)
+	if utils.CommandExists("rc-service") {
+		a.D("Attempting to start docker via rc-service...")
+		if err := runInstallCommandDirect("rc-service", "docker", "start"); err == nil {
+			return nil
+		}
+	}
+
+	// Try service command (generic fallback)
+	if utils.CommandExists("service") {
+		a.D("Attempting to start docker via service...")
+		if err := runInstallCommandDirect("service", "docker", "start"); err == nil {
+			return nil
+		}
+	}
+
+	// Try starting dockerd directly as last resort
+	a.D("Attempting to start dockerd directly...")
+	cmd := exec.Command("dockerd")
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("could not start docker daemon: %w", err)
+	}
+
+	// Wait a moment for daemon to initialize
+	return nil
+}
+
+func startDockerDaemonDarwin(a *app.AppContext) error {
+	a.D("Attempting to start Docker Desktop on macOS...")
+
+	// Try to open Docker Desktop
+	if err := runInstallCommandDirect("open", "-a", "Docker"); err != nil {
+		return fmt.Errorf("failed to start Docker Desktop: %w", err)
+	}
+
+	a.WriteLn("Docker Desktop is starting. Please wait for it to initialize...")
+	return nil
+}
+
+func startDockerDaemonWindows(a *app.AppContext) error {
+	a.D("Attempting to start Docker Desktop on Windows...")
+
+	// Try to start Docker Desktop via PowerShell
+	cmd := exec.Command("powershell", "-Command", "Start-Process 'C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe'")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to start Docker Desktop: %w", err)
+	}
+
+	a.WriteLn("Docker Desktop is starting. Please wait for it to initialize...")
+	return nil
 }

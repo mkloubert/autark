@@ -96,12 +96,13 @@ autark doctor
 autark doc
 autark d
 
-# Automatically install missing dependencies
-autark doctor --repair
+# Automatically install missing dependencies (requires root/admin)
+sudo autark doctor --repair
 autark doctor -r
 ```
 
 The doctor command will:
+- Check if running with root/admin privileges
 - Check if git is installed
 - Check if docker is installed
 - Check if docker daemon is running
@@ -109,9 +110,11 @@ The doctor command will:
 - Show errors for missing tools
 - With `--repair` flag: attempt to install missing dependencies and start docker daemon if not running
 
+**Note:** The `--repair` flag requires root privileges (Linux/macOS) or Administrator privileges (Windows).
+
 #### setup (alias: s)
 
-Sets up a local Docker registry as a background service. If no registry is running on the specified port, it installs one that starts automatically on system boot.
+Sets up a local Docker registry as a background service. Before that, it checks for firewall and SSH server availability and offers to install them if missing.
 
 ```bash
 # Setup with default port (5000)
@@ -120,15 +123,37 @@ autark setup
 # Using short alias
 autark s
 
-# Setup with custom port
+# Setup with custom registry port
 autark setup --registry-port 5001
+
+# Skip firewall check
+autark setup --no-firewall
+
+# Skip SSH server check
+autark setup --no-ssh
+
+# Skip both checks
+autark setup --no-firewall --no-ssh
 ```
 
 The setup command will:
-- Check if Docker is installed
-- Check if a local Docker registry is already running on the specified port
-- If not running: install a Docker registry container with auto-restart policy
-- Verify the registry is running after installation
+1. **Firewall check** (unless `--no-firewall` is set):
+   - Detect installed firewall (ufw, firewalld, iptables, pf, Windows Firewall)
+   - Offer to install a firewall if none is detected
+   - Requires root/admin privileges for installation
+
+2. **SSH server check** (unless `--no-ssh` is set):
+   - Detect if an SSH server is installed and running
+   - Offer to install OpenSSH server if not detected
+   - Generate a random available port > 1024 as suggestion
+   - Ask user for the desired SSH port
+   - Requires root/admin privileges for installation
+
+3. **Docker registry setup**:
+   - Check if Docker is installed
+   - Check if a local Docker registry is already running on the specified port
+   - If not running: install a Docker registry container with auto-restart policy
+   - Verify the registry is running after installation
 
 ## Configuration
 
