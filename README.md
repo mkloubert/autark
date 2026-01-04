@@ -82,7 +82,52 @@ autark --help
 autark --version
 ```
 
-More commands will be added as the project develops.
+### Available Commands
+
+#### doctor (aliases: doc, d)
+
+Checks if all required tools (git, docker) are installed on your system.
+
+```bash
+# Check system requirements
+autark doctor
+
+# Using short aliases
+autark doc
+autark d
+
+# Automatically install missing dependencies
+autark doctor --repair
+autark doctor -r
+```
+
+The doctor command will:
+- Check if git is installed
+- Check if docker is installed
+- Display version information for installed tools
+- Show errors for missing tools
+- With `--repair` flag: attempt to install missing dependencies using your system's package manager
+
+#### setup (alias: s)
+
+Sets up a local Docker registry as a background service. If no registry is running on the specified port, it installs one that starts automatically on system boot.
+
+```bash
+# Setup with default port (5000)
+autark setup
+
+# Using short alias
+autark s
+
+# Setup with custom port
+autark setup --registry-port 5001
+```
+
+The setup command will:
+- Check if Docker is installed
+- Check if a local Docker registry is already running on the specified port
+- If not running: install a Docker registry container with auto-restart policy
+- Verify the registry is running after installation
 
 ## Configuration
 
@@ -198,18 +243,22 @@ go mod download
 
 # Build
 go build -o autark .
-
-# Run tests
-go test ./...
 ```
 
 ### Project Structure
 
 ```
 autark/
-├── cli/
-│   └── app/
-│       └── app_context.go    # Application context and stream helpers
+├── app/
+│   ├── app_config.go          # Application configuration
+│   └── app_context.go         # Application context and stream helpers
+├── commands/
+│   ├── commands.go            # Command initialization
+│   ├── doctor.go              # Doctor command implementation
+│   └── setup.go               # Setup command implementation
+├── utils/
+│   ├── command.go             # Command execution utilities
+│   └── platform.go            # Platform detection utilities
 ├── install.sh                 # Unix installation script
 ├── install.ps1                # Windows/PowerShell installation script
 ├── go.mod                     # Go module file
@@ -224,17 +273,14 @@ Contributions are welcome! Here's how you can help:
 1. **Fork** the repository
 2. **Create** a new branch for your feature (`git checkout -b feature/my-feature`)
 3. **Make** your changes
-4. **Write** tests for your changes
-5. **Run** the tests (`go test ./...`)
-6. **Commit** your changes (`git commit -m 'Add my feature'`)
-7. **Push** to your branch (`git push origin feature/my-feature`)
-8. **Open** a Pull Request
+4. **Commit** your changes (`git commit -m 'Add my feature'`)
+5. **Push** to your branch (`git push origin feature/my-feature`)
+6. **Open** a Pull Request
 
 ### Code Guidelines
 
 - Follow Go best practices and conventions
 - Use the Cobra library patterns for CLI commands
-- Write tests for all new commands
 - Use English for all code and documentation
 - Use the stream helpers from `cli/app/app_context.go` for I/O
 

@@ -29,4 +29,5 @@ import (
 // for a specific app
 func InitCommands(a *app.AppContext) {
 	initDoctorCommand(a)
+	initSetupCommand(a)
 }
