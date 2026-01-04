@@ -28,5 +28,5 @@ import (
 // InitCommands initializes all commands
 // for a specific app
 func InitCommands(a *app.AppContext) {
-	initFooCommand(a)
+	initDoctorCommand(a)
 }

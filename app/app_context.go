@@ -26,17 +26,19 @@ import (
 	"log"
 	"os"
 
+	"github.com/mkloubert/autark/utils"
 	"github.com/spf13/cobra"
 )
 
 // AppContext handles the current application context
 type AppContext struct {
-	config  *AppConfig
-	logger  *log.Logger
-	stderr  *os.File
-	stdin   *os.File
-	stdout  *os.File
-	rootCmd *cobra.Command
+	config   *AppConfig
+	logger   *log.Logger
+	platform *utils.PlatformInfo
+	stderr   *os.File
+	stdin    *os.File
+	stdout   *os.File
+	rootCmd  *cobra.Command
 }
 
 // NewAppContext creates a new instance of AppContext and returns
@@ -62,6 +64,7 @@ func NewAppContext() (*AppContext, error) {
 	flags.BoolVarP(&config.Verbose, "verbose", "", false, "verbose output")
 
 	a.config = config
+	a.platform = utils.DetectPlatform()
 	a.rootCmd = rootCmd
 	a.stderr = os.Stderr
 	a.stdin = os.Stdin
@@ -124,6 +127,12 @@ func (a *AppContext) P(format string, args ...any) {
 	}
 
 	l.Panicf("%s%s%s", "[PANIC] ", fmt.Sprintf(format, args...), a.Config().EOL)
+}
+
+// Platform returns the platform information
+// of this app
+func (a *AppContext) Platform() *utils.PlatformInfo {
+	return a.platform
 }
 
 // RootCommand returns the unterlying root command
