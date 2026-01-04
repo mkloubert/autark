@@ -42,9 +42,30 @@ type SetupOptions struct {
 	RegistryPort int
 }
 
+func checkDockerDaemonRunning() error {
+	output, err := utils.RunCommand("docker", "info")
+	if err != nil {
+		outputStr := strings.TrimSpace(string(output))
+		if strings.Contains(outputStr, "Cannot connect to the Docker daemon") ||
+			strings.Contains(outputStr, "Is the docker daemon running") {
+			return fmt.Errorf("Docker daemon is not running. Please start Docker first")
+		}
+		if outputStr != "" {
+			return fmt.Errorf("Docker error: %s", outputStr)
+		}
+		return fmt.Errorf("Docker daemon is not accessible: %w", err)
+	}
+	return nil
+}
+
 func checkRegistryRunning(a *app.AppContext, port int) (bool, error) {
 	if !utils.CommandExists("docker") {
 		return false, fmt.Errorf("docker is not installed")
+	}
+
+	// Check if Docker daemon is running
+	if err := checkDockerDaemonRunning(); err != nil {
+		return false, err
 	}
 
 	// Check if container exists and is running
